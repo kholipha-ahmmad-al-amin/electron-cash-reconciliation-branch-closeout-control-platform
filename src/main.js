@@ -1,0 +1,8 @@
+const { app, BrowserWindow, ipcMain } = require('electron'); const path = require('path'); const { Store, DomainError } = require('./domain');
+const store = new Store(); const actors = { 'cashier-local': { name: 'Jannat Sultana', role: 'cashier' }, 'manager-local': { name: 'Rashed Kabir', role: 'branch-manager' }, 'auditor-local': { name: 'Mina Rahman', role: 'finance-auditor' } };
+function actor(key) { const value = actors[key]; if (!value) throw new DomainError('FORBIDDEN', 'A valid desktop session key is required'); return value; }
+function invoke(handler) { return async (_event, key, ...args) => { try { return { ok: true, data: handler(actor(key), ...args) }; } catch (error) { return { ok: false, error: { code: error.code || 'FAILURE', message: error.message || 'The operation could not be completed' } }; } }; }
+ipcMain.handle('snapshot', invoke(actor => store.snapshot(actor))); ipcMain.handle('open', invoke((actor, payload) => store.open(actor, payload))); ipcMain.handle('adjust', invoke((actor, id, payload) => store.addAdjustment(actor, id, payload))); ipcMain.handle('submit', invoke((actor, id) => store.submit(actor, id))); ipcMain.handle('approve', invoke((actor, id, payload) => store.approve(actor, id, payload)));
+function createWindow() { const win = new BrowserWindow({ width: 1400, height: 900, webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true } }); win.loadFile(path.join(__dirname, '../renderer/index.html')); }
+app.whenReady().then(createWindow); app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+
